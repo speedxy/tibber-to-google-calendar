@@ -1,0 +1,14 @@
+# Authentifizierungs- und Konfigurationsdateien
+your-client-secret.json
+token.json
+config.json
+
+# Python-spezifische Ignorierungen
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Virtuelle Umgebungen
+venv/
+.env/

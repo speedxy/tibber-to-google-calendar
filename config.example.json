@@ -1,0 +1,6 @@
+{
+    "TIBBER_API_KEY": "dein-tibber-api-key-hier",
+    "GOOGLE_CALENDAR_ID": "dein-google-kalender-id-hier",
+    "HIGH_PRICE_THRESHOLD": 0.40,
+    "LOW_PRICE_THRESHOLD": 0.30
+}
