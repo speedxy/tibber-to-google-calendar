@@ -25,7 +25,7 @@ def authenticate_google_calendar():
             )
             creds = flow.run_local_server(port=0)
 
-        with open('token.json', 'w') as token:
+        with open(os.path.join(BASE_DIR, 'token.json'), 'w') as token:
             token.write(creds.to_json())
 
     return creds
