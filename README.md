@@ -6,7 +6,7 @@ Dieses Skript ruft die aktuellen Strompreise von [Tibber](https://tibber.com) ab
 
 ### 1️⃣ Repository klonen
 ```sh
-git clone https://github.com/dein-username/tibber-to-google-calendar.git
+git clone https://github.com/speedxy/tibber-to-google-calendar.git
 cd tibber-to-google-calendar
 ```
 
