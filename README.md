@@ -1,4 +1,4 @@
-# Tibber zu Google Calendar 🗕️⚡
+# Tibber zu Google Calendar
 
 Dieses Skript ruft die aktuellen Strompreise von [Tibber](https://tibber.com) ab und trägt relevante Zeiträume als Ereignisse in den Google Kalender ein.
 
