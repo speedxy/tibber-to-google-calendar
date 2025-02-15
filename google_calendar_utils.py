@@ -13,8 +13,9 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 def authenticate_google_calendar():
     """Authentifiziert sich bei der Google Calendar API und speichert das Token"""
     creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json')
+    token_file = (os.path.join(BASE_DIR, 'token.json'))
+    if os.path.exists(token_file):
+        creds = Credentials.from_authorized_user_file(token_file)
 
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
@@ -25,7 +26,7 @@ def authenticate_google_calendar():
             )
             creds = flow.run_local_server(port=0)
 
-        with open(os.path.join(BASE_DIR, 'token.json'), 'w') as token:
+        with open(token_file, 'w') as token:
             token.write(creds.to_json())
 
     return creds
