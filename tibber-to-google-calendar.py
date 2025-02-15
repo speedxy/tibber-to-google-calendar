@@ -7,6 +7,8 @@ from dateutil import parser  # Für robustere ISO 8601-Datumsverarbeitung
 from google_calendar_utils import authenticate_google_calendar, create_google_calendar_event, delete_existing_events
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+# 🔹 HIER LOG-LEVEL MANUELL ÄNDERN (DEBUG, INFO, WARNING, ERROR, CRITICAL)
+LOG_LEVEL = logging.WARNING  # Standard: WARNING (keine Cron-Mails). Setze auf DEBUG für mehr Logs.
 
 # ====== 🔧 KONFIGURATION AUS `config.json` LADEN ======
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
@@ -21,7 +23,7 @@ TIBBER_API_KEY = config["TIBBER_API_KEY"]
 GOOGLE_CALENDAR_ID = config["GOOGLE_CALENDAR_ID"]
 
 # ====== 🛠️ LOGGING KONFIGURIEREN ======
-logging.basicConfig(level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s")
 logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)  # Unterdrückt unwichtige Google-API-Warnungen
 
 # ====== 📡 TIBBER API ======
