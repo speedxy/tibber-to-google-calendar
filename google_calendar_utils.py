@@ -27,12 +27,29 @@ def authenticate_google_calendar():
             if creds and creds.expired and creds.refresh_token:
                 logging.info("🔄 Token ist abgelaufen – versuche zu erneuern...")
                 creds.refresh(Request())
+
             else:
                 logging.warning("⚠️ Kein gültiges Token gefunden – erneute Anmeldung erforderlich.")
-                flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-                
-                # Nutzung von run_console() für Server ohne GUI
-                creds = flow.run_local_server(port=0, open_browser=False)
+                flow = InstalledAppFlow.from_client_secrets_file(
+                    CLIENT_SECRET_FILE, SCOPES,
+                    redirect_uri="urn:ietf:wg:oauth:2.0:oob"
+                )
+
+                # 🚀 Manuelle Anmeldung für Server ohne GUI
+                auth_url, _ = flow.authorization_url(
+                    access_type="offline",
+                    prompt="consent",
+                    include_granted_scopes="true"
+                )
+
+                print("\n🔗 Öffne diesen Link in einem beliebigen Browser und melde dich an:")
+                print(auth_url)
+
+                auth_code = input("\n🔑 Gib den Bestätigungscode ein: ").strip()
+
+                # 💡 Token direkt mit dem Code abrufen
+                flow.fetch_token(code=auth_code)
+                creds = flow.credentials  # 🔹 Credentials korrekt setzen
 
             # Speichere das neue Token
             with open(TOKEN_FILE, "w") as token:
@@ -42,13 +59,27 @@ def authenticate_google_calendar():
         except RefreshError:
             logging.error("❌ Token konnte nicht erneuert werden. Es wurde widerrufen oder ist abgelaufen.")
             logging.info("🔄 Lösche altes Token und fordere eine neue Anmeldung an...")
+
             if os.path.exists(TOKEN_FILE):
                 os.remove(TOKEN_FILE)
 
-            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
-            
-            # Wieder run_console(), um im Terminal die Anmeldung zu machen
-            creds = flow.run_local_server(port=0, open_browser=False)
+            flow = InstalledAppFlow.from_client_secrets_file(
+                CLIENT_SECRET_FILE, SCOPES,
+                redirect_uri="urn:ietf:wg:oauth:2.0:oob"
+            )
+
+            auth_url, _ = flow.authorization_url(
+                access_type="offline",
+                prompt="consent",
+                include_granted_scopes="true"
+            )
+            print("\n🔗 Öffne diesen Link in einem beliebigen Browser und melde dich an:")
+            print(auth_url)
+
+            auth_code = input("\n🔑 Gib den Bestätigungscode ein: ").strip()
+
+            flow.fetch_token(code=auth_code)
+            creds = flow.credentials  # 🔹 Credentials korrekt setzen
 
             with open(TOKEN_FILE, "w") as token:
                 token.write(creds.to_json())
