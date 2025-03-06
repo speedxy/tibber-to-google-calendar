@@ -1,33 +1,58 @@
 import os
 import logging
-from datetime import datetime, timezone
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from google_auth_oauthlib.flow import InstalledAppFlow
+from google.auth.exceptions import RefreshError
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
+# Pfade zu den Anmeldedaten
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+TOKEN_FILE = os.path.join(BASE_DIR, "token.json")
+CLIENT_SECRET_FILE = os.path.join(BASE_DIR, "your-client-secret.json")
+SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
-# ====== 🔐 GOOGLE CALENDAR AUTH ======
 def authenticate_google_calendar():
-    """Authentifiziert sich bei der Google Calendar API und speichert das Token"""
+    """Authentifiziert sich bei der Google Calendar API und erneuert das Token, falls nötig."""
     creds = None
-    token_file = (os.path.join(BASE_DIR, 'token.json'))
-    if os.path.exists(token_file):
-        creds = Credentials.from_authorized_user_file(token_file)
 
+    # Prüfe, ob ein gespeichertes Token existiert
+    if os.path.exists(TOKEN_FILE):
+        creds = Credentials.from_authorized_user_file(TOKEN_FILE, SCOPES)
+
+    # Falls das Token nicht existiert oder nicht gültig ist, neue Authentifizierung
     if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            flow = InstalledAppFlow.from_client_secrets_file(
-                os.path.join(BASE_DIR, 'your-client-secret.json'), ['https://www.googleapis.com/auth/calendar.events']
-            )
-            creds = flow.run_local_server(port=0)
+        try:
+            if creds and creds.expired and creds.refresh_token:
+                logging.info("🔄 Token ist abgelaufen – versuche zu erneuern...")
+                creds.refresh(Request())
+            else:
+                logging.warning("⚠️ Kein gültiges Token gefunden – erneute Anmeldung erforderlich.")
+                flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
+                
+                # Nutzung von run_console() für Server ohne GUI
+                creds = flow.run_local_server(port=0, open_browser=False)
 
-        with open(token_file, 'w') as token:
-            token.write(creds.to_json())
+            # Speichere das neue Token
+            with open(TOKEN_FILE, "w") as token:
+                token.write(creds.to_json())
+                logging.info("✅ Neues Token gespeichert!")
+
+        except RefreshError:
+            logging.error("❌ Token konnte nicht erneuert werden. Es wurde widerrufen oder ist abgelaufen.")
+            logging.info("🔄 Lösche altes Token und fordere eine neue Anmeldung an...")
+            if os.path.exists(TOKEN_FILE):
+                os.remove(TOKEN_FILE)
+
+            flow = InstalledAppFlow.from_client_secrets_file(CLIENT_SECRET_FILE, SCOPES)
+            
+            # Wieder run_console(), um im Terminal die Anmeldung zu machen
+            creds = flow.run_local_server(port=0, open_browser=False)
+
+            with open(TOKEN_FILE, "w") as token:
+                token.write(creds.to_json())
+                logging.info("✅ Neues Token gespeichert!")
 
     return creds
 

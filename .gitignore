@@ -12,3 +12,6 @@ __pycache__/
 # Virtuelle Umgebungen
 venv/
 .env/
+
+# Systemspezifische Ignorierungen
+.DS_STORE
