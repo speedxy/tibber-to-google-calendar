@@ -8,7 +8,7 @@ from google_calendar_utils import authenticate_google_calendar, create_google_ca
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # 🔹 HIER LOG-LEVEL MANUELL ÄNDERN (DEBUG, INFO, WARNING, ERROR, CRITICAL)
-LOG_LEVEL = logging.DEBUG  # Standard: WARNING (keine Cron-Mails). Setze auf DEBUG für mehr Logs.
+LOG_LEVEL = logging.WARNING  # Standard: WARNING (keine Cron-Mails). Setze auf DEBUG für mehr Logs.
 
 # ====== 🔧 KONFIGURATION AUS `config.json` LADEN ======
 CONFIG_FILE = os.path.join(BASE_DIR, "config.json")
