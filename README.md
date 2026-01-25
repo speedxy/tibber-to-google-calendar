@@ -1,80 +1,93 @@
-# Tibber zu Google Calendar
+# **Tibber to Google Calendar**
 
-Dieses Skript ruft die aktuellen Strompreise von [Tibber](https://tibber.com) ab und trägt relevante Zeiträume als Ereignisse in den Google Kalender ein.
+This script retrieves current electricity prices from Tibber and synchronizes relevant price periods (Cheap / Normal / Expensive) as events into a Google Calendar. This allows for easy visualization of electricity costs directly within your calendar app, facilitating the scheduling of high-consumption appliances.
 
-## 🔧 Installation & Einrichtung
+## **Prerequisites**
 
-### 1️⃣ Repository klonen
-```sh
-git clone https://github.com/speedxy/tibber-to-google-calendar.git
+Before setting up the script, ensure you have the following:
+
+* Python 3.9 or higher installed.  
+* A Tibber account with access to the Developer API.  
+* A Google Cloud project with the Calendar API enabled.  
+* Access to a terminal (Linux, macOS, or WSL on Windows).
+
+## **Installation and Setup**
+
+### **1\. Clone Repository and Prepare Environment**
+
+Perform these steps on your computer or server:
+
+git clone \[https://github.com/speedxy/tibber-to-google-calendar.git\](https://github.com/speedxy/tibber-to-google-calendar.git)  
 cd tibber-to-google-calendar
-```
 
-### 2️⃣ Abhängigkeiten installieren
-Das Skript benötigt Python 3 und die Pakete in `requirements.txt`:
+\# Create and activate virtual environment  
+python3 \-m venv .venv  
+source .venv/bin/activate
 
-```sh
-pip install -r requirements.txt
-```
+\# Install dependencies  
+pip install \-r requirements.txt
 
-### 3️⃣ API-Zugangsdaten einrichten
-Kopiere die Datei `config.example.json` und benenne sie in `config.json` um:
+### **2\. Configuration (config.json)**
 
-```sh
+Copy the example configuration and insert your credentials:
+
 cp config.example.json config.json
-```
 
-Öffne `config.json` und trage deine API-Keys und Werte ein:
+Contents of config.json:
 
-```json
-{
-  "TIBBER_API_KEY": "dein-tibber-api-key-hier",
-  "GOOGLE_CALENDAR_ID": "dein-google-kalender-id-hier"
-}
-```
+* TIBBER\_API\_KEY: Your personal token from https://www.google.com/search?q=developer.tibber.com.  
+* GOOGLE\_CALENDAR\_ID: The ID of your target calendar (found in calendar settings under "Integration").
 
-#### 🔐 Tibber Access Token erhalten
-1. Gehe auf [Tibber Developer](https://developer.tibber.com/).
-2. Melde dich mit deinem Tibber-Account an.
-3. Erstelle einen Access Token und kopiere ihn in `config.json` unter `TIBBER_API_KEY`.
+### **3\. Google Service Account Setup**
 
-#### 👤 Google API Zugang einrichten
-1. Öffne die [Google Cloud Console](https://console.cloud.google.com/).
-2. Erstelle ein neues Projekt oder wähle ein bestehendes.
-3. Aktiviere die **Google Calendar API** unter `APIs & Dienste`.
-4. Erstelle Zugangsdaten vom Typ **OAuth 2.0 Client-ID**.
-5. Lade die Datei `your-client-secret.json` herunter und speichere sie im Projektverzeichnis.
+A Service Account is required for automated access without the need for regular manual browser logins.
 
-#### 📅 Google Kalender-ID abrufen
-1. Öffne Google Kalender unter [calendar.google.com](https://calendar.google.com/).
-2. Klicke auf das Zahnrad-Symbol ⚙ und wähle `Einstellungen`.
-3. Wähle den gewünschten Kalender aus und kopiere die **Kalender-ID**.
-4. Trage die ID in `config.json` unter `GOOGLE_CALENDAR_ID` ein.
+1. Project Creation: Go to the Google Cloud Console (console.cloud.google.com).  
+2. Enable API: Search for "Google Calendar API" and enable it for your project.  
+3. Create Service Account:  
+   * Navigate to IAM & Admin \> Service Accounts.  
+   * Click \+ Create Service Account and provide a name (e.g., tibber-calendar-bot).  
+   * Complete the process by clicking Done.  
+4. Create JSON Key:  
+   * Click on the created Service Account in the list.  
+   * Navigate to the Keys tab \> Add Key \> Create new key.  
+   * Select JSON format. The file will be downloaded to your machine.  
+5. Integration:  
+   * Rename the downloaded file to service\_account.json.  
+   * Move it to the root directory of this project.  
+   * Note: This file is included in .gitignore and must never be uploaded to public repositories.
 
-### 4️⃣ Ersten Lauf starten
-```sh
+### **4\. Calendar Sharing**
+
+The Service Account must be explicitly authorized to access your target calendar:
+
+1. Open service\_account.json and copy the email address found under "client\_email".  
+2. Open Google Calendar in your browser.  
+3. Go to the settings of the target calendar under "Settings and sharing".  
+4. Under "Share with specific people or groups", add the Service Account email address.  
+5. Set permissions to "Make changes to events".
+
+## **Usage**
+
+Start the script manually to verify functionality:
+
+source .venv/bin/activate  
 python tibber-to-google-calendar.py
-```
 
-Beim ersten Start wirst du zur Authentifizierung bei Google aufgefordert. Danach speichert das Skript das OAuth-Token in `token.json`.
+The script will delete existing entries in the current timeframe created by the script and insert new price data.
 
-## ⚙️ Automatisierung mit Cron (optional)
-Füge das Skript in den Cron-Job-Manager ein, um es täglich um 18:00 Uhr auszuführen:
+## **Automation (Cronjob)**
 
-```sh
-crontab -e
-```
+To run the script automatically every day (e.g., at 18:00), you can create a cronjob:
 
-Füge folgende Zeile hinzu:
-```sh
-0 18 * * * /usr/bin/python3 /pfad/zu/tibber-to-google-calendar.py
-```
+crontab \-e
 
-## 🛠️ Fehlersuche
-Falls es Probleme gibt, aktiviere das Logging:
+Example entry (ensure absolute paths are used):
 
-```sh
-python tibber-to-google-calendar.py > log.txt 2>&1
-```
+0 18 \* \* \* /path/to/project/.venv/bin/python /path/to/project/tibber-to-google-calendar.py \>\> /path/to/project/cron.log 2\>&1
 
-Prüfe `log.txt` auf Fehlermeldungen.
+## **Development**
+
+* Python Version: Tested with Python 3.9, 3.10, and 3.11.  
+* Secrets: Files like service\_account.json and config.json are excluded from tracking via .gitignore.  
+* Dependencies: If you change the utilized libraries, update the requirements file using: pip freeze \> requirements.txt.
