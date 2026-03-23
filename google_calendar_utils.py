@@ -1,6 +1,9 @@
 import os
 import logging
+from datetime import datetime
+
 from google.oauth2 import service_account
+from google.oauth2.service_account import Credentials
 from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 
@@ -9,10 +12,11 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 SERVICE_ACCOUNT_FILE = os.path.join(BASE_DIR, "service_account.json")
 SCOPES = ["https://www.googleapis.com/auth/calendar.events"]
 
-def authenticate_google_calendar():
+
+def authenticate_google_calendar() -> Credentials | None:
     """
     Authentifiziert sich über einen Service Account.
-    Ersetzt den alten interaktiven OAuth-Flow.
+    Gibt None zurück, wenn die Authentifizierung fehlschlägt.
     """
     if not os.path.exists(SERVICE_ACCOUNT_FILE):
         logging.error(f"❌ Service-Account-Datei nicht gefunden: {SERVICE_ACCOUNT_FILE}")
@@ -20,7 +24,7 @@ def authenticate_google_calendar():
 
     try:
         creds = service_account.Credentials.from_service_account_file(
-            SERVICE_ACCOUNT_FILE, 
+            SERVICE_ACCOUNT_FILE,
             scopes=SCOPES
         )
         return creds
@@ -28,8 +32,16 @@ def authenticate_google_calendar():
         logging.error(f"❌ Fehler bei der Service-Account-Authentifizierung: {e}")
         return None
 
+
 # ====== 📅 KALENDER-EVENTS ERSTELLEN ======
-def create_google_calendar_event(start_time, end_time, summary, calendar_id, creds, description=""):
+def create_google_calendar_event(
+    start_time: datetime,
+    end_time: datetime,
+    summary: str,
+    calendar_id: str,
+    creds: Credentials,
+    description: str = ""
+) -> None:
     """Erstellt einen Google-Kalendereintrag"""
     try:
         service = build('calendar', 'v3', credentials=creds)
@@ -39,9 +51,8 @@ def create_google_calendar_event(start_time, end_time, summary, calendar_id, cre
             'start': {'dateTime': start_time.isoformat(), 'timeZone': 'UTC'},
             'end': {'dateTime': end_time.isoformat(), 'timeZone': 'UTC'},
         }
-        created_event = service.events().insert(calendarId=calendar_id, body=event).execute()
-        
-        # Formatierung des Log-Eintrags mit "DD.MM. HH:MM"
+        service.events().insert(calendarId=calendar_id, body=event).execute()
+
         start_str = start_time.strftime('%d.%m. %H:%M')
         end_str = end_time.strftime('%d.%m. %H:%M')
         logging.info(f'✅ Erstellt: {summary} ({start_str} - {end_str})')
@@ -49,8 +60,15 @@ def create_google_calendar_event(start_time, end_time, summary, calendar_id, cre
     except HttpError as error:
         logging.error(f'❌ Fehler beim Erstellen von Events: {error}')
 
+
 # ====== 🗑️ KALENDER-EVENTS LÖSCHEN ======
-def delete_existing_events(calendar_id, creds, start_time, end_time, search_string):
+def delete_existing_events(
+    calendar_id: str,
+    creds: Credentials,
+    start_time: datetime,
+    end_time: datetime,
+    search_string: str
+) -> None:
     """Löscht bestehende Kalendereinträge innerhalb des gegebenen Zeitraums, die den Such-String enthalten"""
     try:
         service = build('calendar', 'v3', credentials=creds)

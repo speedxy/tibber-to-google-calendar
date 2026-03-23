@@ -1,9 +1,13 @@
-import requests
-import os
+from __future__ import annotations
+
 import json
 import logging
-from datetime import datetime, timedelta, timezone
-from dateutil import parser  # Für robustere ISO 8601-Datumsverarbeitung
+import os
+from datetime import datetime, timedelta
+
+import requests
+from dateutil import parser
+
 from google_calendar_utils import authenticate_google_calendar, create_google_calendar_event, delete_existing_events
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -24,10 +28,10 @@ GOOGLE_CALENDAR_ID = config["GOOGLE_CALENDAR_ID"]
 
 # ====== 🛠️ LOGGING KONFIGURIEREN ======
 logging.basicConfig(level=LOG_LEVEL, format="%(asctime)s - %(levelname)s - %(message)s")
-logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)  # Unterdrückt unwichtige Google-API-Warnungen
+logging.getLogger("googleapiclient.discovery_cache").setLevel(logging.ERROR)
 
 # ====== 📡 TIBBER API ======
-def fetch_tibber_prices(api_key):
+def fetch_tibber_prices(api_key: str) -> list[dict]:
     """Holt die Strompreise von Tibber"""
     url = 'https://api.tibber.com/v1-beta/gql'
     headers = {'Authorization': f'Bearer {api_key}', 'Content-Type': 'application/json'}
@@ -55,73 +59,101 @@ def fetch_tibber_prices(api_key):
     """
     logging.info("📡 Sende Anfrage an Tibber API...")
     response = requests.post(url, headers=headers, json={'query': query})
+    response.raise_for_status()
+
     data = response.json()
-    prices = data['data']['viewer']['homes'][0]['currentSubscription']['priceInfo']
-    logging.info(f"✅ Tibber API Antwort: {len(prices['today']) + len(prices.get('tomorrow', []))} Preisdaten gefunden.")
-    
-    # 📜 Empfangene Preisdaten auflisten
-    for price in prices['today'] + prices.get('tomorrow', []):
-        time = parser.isoparse(price['startsAt'])
-        formatted_time = time.strftime('%d.%m.%Y %H:%M')
-        logging.info(f"{formatted_time} - {formatted_time[:-5]}: {price['total']:.2f} € ({price['level']})")
-    
-    return prices['today'] + prices.get('tomorrow', [])
+
+    if 'errors' in data:
+        raise RuntimeError(f"❌ Tibber API Fehler: {data['errors']}")
+
+    try:
+        prices = data['data']['viewer']['homes'][0]['currentSubscription']['priceInfo']
+    except (KeyError, IndexError, TypeError) as e:
+        raise RuntimeError(f"❌ Unerwartete API-Antwortstruktur: {e}") from e
+
+    today_prices = prices.get('today') or []
+    tomorrow_prices = prices.get('tomorrow') or []
+    all_prices = today_prices + tomorrow_prices
+
+    logging.info(f"✅ Tibber API Antwort: {len(all_prices)} Preisdaten gefunden.")
+
+    for price in all_prices:
+        price_time = parser.isoparse(price['startsAt'])
+        formatted_time = price_time.strftime('%d.%m.%Y %H:%M')
+        logging.info(f"{formatted_time}: {price['total']:.2f} € ({price['level']})")
+
+    return all_prices
 
 # ====== 📊 PREIS-PERIODEN GRUPPIEREN ======
-def group_price_periods(prices):
+def group_price_periods(prices: list[dict]) -> dict[str, list[tuple[datetime, datetime]]]:
     """Gruppiert Preisperioden anhand der Tibber-Kategorisierung"""
-    categorized_periods = {
+    categorized_periods: dict[str, list[tuple[datetime, datetime]]] = {
         "CHEAP": [], "VERY_CHEAP": [],
         "EXPENSIVE": [], "VERY_EXPENSIVE": []
     }
-    current_periods = {key: None for key in categorized_periods}
+
+    if not prices:
+        return categorized_periods
+
+    current_periods: dict[str, datetime | None] = {key: None for key in categorized_periods}
+    last_time = None
 
     for price in prices:
         price_level = price['level']
-        time = parser.isoparse(price['startsAt'])
+        price_time = parser.isoparse(price['startsAt'])
+        last_time = price_time
 
         if price_level == "NORMAL":
-            for level in current_periods.keys():
-                if current_periods[level] is not None:
-                    categorized_periods[level].append((current_periods[level], time))
+            for level in current_periods:
+                start = current_periods[level]
+                if start is not None:
+                    categorized_periods[level].append((start, price_time))
                     current_periods[level] = None
             continue
 
         if price_level in categorized_periods:
             if current_periods[price_level] is None:
-                current_periods[price_level] = time
+                current_periods[price_level] = price_time
             else:
                 continue
 
-        for level in current_periods.keys():
-            if level != price_level and current_periods[level] is not None:
-                categorized_periods[level].append((current_periods[level], time))
+        for level in current_periods:
+            start = current_periods[level]
+            if level != price_level and start is not None:
+                categorized_periods[level].append((start, price_time))
                 current_periods[level] = None
 
-    for level in current_periods.keys():
-        if current_periods[level] is not None:
-            categorized_periods[level].append((current_periods[level], time + timedelta(hours=1)))
+    # Offene Perioden mit der letzten bekannten Stunde + 1h abschließen
+    if last_time is not None:
+        for level in current_periods:
+            start = current_periods[level]
+            if start is not None:
+                categorized_periods[level].append((start, last_time + timedelta(hours=1)))
 
     logging.info("📊 Erkannte Preisperioden:")
     for level, periods in categorized_periods.items():
         for start, end in periods:
             logging.info(f"  {level}: {start.strftime('%d.%m.%Y %H:%M')} - {end.strftime('%d.%m.%Y %H:%M')}")
-    
+
     return categorized_periods
 
 # ====== 🚀 HAUPTLAUF ======
-def main():
+def main() -> None:
     logging.info("📡 Tibber-Strompreise abrufen...")
     tibber_prices = fetch_tibber_prices(TIBBER_API_KEY)
     creds = authenticate_google_calendar()
-    
+
+    if creds is None:
+        logging.error("❌ Google Calendar Authentifizierung fehlgeschlagen. Abbruch.")
+        return
+
     categorized_periods = group_price_periods(tibber_prices)
 
     # Bestimme die Zeit-Range der Tibber-Daten
     all_times = [parser.isoparse(p['startsAt']) for p in tibber_prices]
     if all_times:
         min_time = min(all_times)
-        max_time = max(all_times) + timedelta(hours=1)  # Endzeit inkl. letzter Stunde
+        max_time = max(all_times) + timedelta(hours=1)
         start_str = min_time.strftime('%d.%m. %H:%M')
         end_str = max_time.strftime('%d.%m. %H:%M')
 
@@ -132,7 +164,7 @@ def main():
     for level, periods in categorized_periods.items():
         for start_time, end_time in periods:
             period_prices = [
-                (parser.isoparse(p['startsAt']), round(p['total'] * 100, 1))  
+                (parser.isoparse(p['startsAt']), round(p['total'] * 100, 1))
                 for p in tibber_prices if start_time <= parser.isoparse(p['startsAt']) < end_time
             ]
 
@@ -144,10 +176,9 @@ def main():
                     price_range = f"{min_price:.1f}ct"
                 else:
                     price_range = f"{min_price:.1f}ct - {max_price:.1f}ct"
-                
-                title_prefix = "Niedriger Strompreis" if level in ["CHEAP", "VERY_CHEAP"] else "Strompreis"
 
-                description = "\n".join(f"{time.strftime('%H:%M')}: {price:.1f}ct" for time, price in period_prices)
+                title_prefix = "Niedriger Strompreis" if level in ["CHEAP", "VERY_CHEAP"] else "Strompreis"
+                description = "\n".join(f"{pt.strftime('%H:%M')}: {pp:.1f}ct" for pt, pp in period_prices)
             else:
                 price_range = "Unbekannt"
                 title_prefix = "Strompreis"

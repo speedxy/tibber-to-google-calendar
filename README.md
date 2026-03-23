@@ -21,8 +21,8 @@ Perform these steps on your computer or server:
 git clone https://github.com/speedxy/tibber-to-google-calendar.git
 cd tibber-to-google-calendar
 
-# Create and activate virtual environment  
-python3 -m venv .venv  
+# Create and activate virtual environment
+python3 -m venv .venv
 source .venv/bin/activate
 
 # Install dependencies  
