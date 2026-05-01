@@ -62,14 +62,6 @@ def create_google_calendar_event(
             'end': {'dateTime': end_time.isoformat(), 'timeZone': 'UTC'},
             'reminders': {'useDefault': False, 'overrides': overrides},
         }
-        if reminders_minutes is not None:
-            event['reminders'] = {
-                'useDefault': False,
-                'overrides': [
-                    {'method': 'popup', 'minutes': minutes}
-                    for minutes in reminders_minutes
-                ],
-            }
         service.events().insert(calendarId=calendar_id, body=event).execute()
 
         start_str = start_time.strftime('%d.%m. %H:%M')
