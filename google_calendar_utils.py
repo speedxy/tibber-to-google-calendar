@@ -43,14 +43,24 @@ def create_google_calendar_event(
     description: str = "",
     reminders_minutes: list[int] | None = None
 ) -> None:
-    """Erstellt einen Google-Kalendereintrag"""
+    """Erstellt einen Google-Kalendereintrag.
+
+    Standardmäßig werden keine Erinnerungen gesetzt (auch keine Kalender-
+    Defaults). Über `reminders_minutes` können Popup-Erinnerungen in
+    Minuten vor dem Start angegeben werden.
+    """
     try:
         service = build('calendar', 'v3', credentials=creds)
+        overrides = [
+            {'method': 'popup', 'minutes': minutes}
+            for minutes in (reminders_minutes or [])
+        ]
         event = {
             'summary': summary,
             'description': description,
             'start': {'dateTime': start_time.isoformat(), 'timeZone': 'UTC'},
             'end': {'dateTime': end_time.isoformat(), 'timeZone': 'UTC'},
+            'reminders': {'useDefault': False, 'overrides': overrides},
         }
         if reminders_minutes is not None:
             event['reminders'] = {
