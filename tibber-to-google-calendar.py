@@ -86,8 +86,13 @@ def fetch_tibber_prices(api_key: str) -> list[dict]:
 
 # ====== 📊 PREIS-PERIODEN GRUPPIEREN ======
 def group_price_periods(prices: list[dict]) -> dict[str, list[tuple[datetime, datetime]]]:
-    """Gruppiert Preisperioden anhand der Tibber-Kategorisierung"""
+    """Gruppiert Preisperioden anhand der Tibber-Kategorisierung.
+
+    Stunden mit negativem Preis werden separat als NEGATIVE gruppiert und
+    nicht zusätzlich in CHEAP/VERY_CHEAP einsortiert.
+    """
     categorized_periods: dict[str, list[tuple[datetime, datetime]]] = {
+        "NEGATIVE": [],
         "CHEAP": [], "VERY_CHEAP": [],
         "EXPENSIVE": [], "VERY_EXPENSIVE": []
     }
@@ -99,7 +104,7 @@ def group_price_periods(prices: list[dict]) -> dict[str, list[tuple[datetime, da
     last_time = None
 
     for price in prices:
-        price_level = price['level']
+        price_level = "NEGATIVE" if price['total'] < 0 else price['level']
         price_time = parser.isoparse(price['startsAt'])
         last_time = price_time
 
@@ -177,7 +182,12 @@ def main() -> None:
                 else:
                     price_range = f"{min_price:.1f}ct - {max_price:.1f}ct"
 
-                title_prefix = "Niedriger Strompreis" if level in ["CHEAP", "VERY_CHEAP"] else "Strompreis"
+                if level == "NEGATIVE":
+                    title_prefix = "Negativer Strompreis"
+                elif level in ["CHEAP", "VERY_CHEAP"]:
+                    title_prefix = "Niedriger Strompreis"
+                else:
+                    title_prefix = "Strompreis"
                 description = "\n".join(f"{pt.strftime('%H:%M')}: {pp:.1f}ct" for pt, pp in period_prices)
             else:
                 price_range = "Unbekannt"
@@ -185,7 +195,11 @@ def main() -> None:
                 description = "Keine Preisdaten verfügbar"
 
             event_title = f"⚡ {title_prefix}: {price_range} [{level}] #Tibber"
-            create_google_calendar_event(start_time, end_time, event_title, GOOGLE_CALENDAR_ID, creds, description)
+            reminders_minutes = [30, 0] if level == "NEGATIVE" else None
+            create_google_calendar_event(
+                start_time, end_time, event_title, GOOGLE_CALENDAR_ID, creds, description,
+                reminders_minutes=reminders_minutes,
+            )
 
     logging.info("Skript abgeschlossen.")
 
