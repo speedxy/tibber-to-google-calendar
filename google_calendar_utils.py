@@ -40,7 +40,8 @@ def create_google_calendar_event(
     summary: str,
     calendar_id: str,
     creds: Credentials,
-    description: str = ""
+    description: str = "",
+    reminders_minutes: list[int] | None = None
 ) -> None:
     """Erstellt einen Google-Kalendereintrag"""
     try:
@@ -51,6 +52,14 @@ def create_google_calendar_event(
             'start': {'dateTime': start_time.isoformat(), 'timeZone': 'UTC'},
             'end': {'dateTime': end_time.isoformat(), 'timeZone': 'UTC'},
         }
+        if reminders_minutes is not None:
+            event['reminders'] = {
+                'useDefault': False,
+                'overrides': [
+                    {'method': 'popup', 'minutes': minutes}
+                    for minutes in reminders_minutes
+                ],
+            }
         service.events().insert(calendarId=calendar_id, body=event).execute()
 
         start_str = start_time.strftime('%d.%m. %H:%M')
