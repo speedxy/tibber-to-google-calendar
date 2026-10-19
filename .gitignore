@@ -25,3 +25,6 @@ venv/
 # Tibber Data API (OAuth-Tokens)
 tibber_data_token.json
 tibber_data_token.json.tmp.*
+
+# Cron-Log auf dem Server
+cron.log
