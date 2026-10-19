@@ -24,7 +24,7 @@ venv/
 .DS_STORE
 # Tibber Data API (OAuth-Tokens)
 tibber_data_token.json
-tibber_data_token.json.tmp.*
+tibber_data_token.json*
 
 # Cron-Log auf dem Server
 cron.log

@@ -33,6 +33,8 @@ class ChargeTarget:
     source_event_id: str
     source_event_summary: str
     parse_warnings: tuple[str, ...] = field(default_factory=tuple)
+    calendar_id: str = ""   # Kalender, aus dem das Ziel stammt
+    writable: bool = True    # Darf der Ladeplan in die Beschreibung geschrieben werden?
 
 
 def parse_title(summary: str) -> tuple[int | None, str | None, list[str]]:
@@ -91,6 +93,9 @@ def load_charge_targets(
         logging.error(f"❌ Fehler beim Lesen der Kalender-Events: {error}")
         return targets
 
+    # accessRole der Antwort: reader/freeBusyReader → Ladeplan nicht in die Beschreibung schreiben.
+    writable = response.get("accessRole") in ("writer", "owner")
+
     for event in response.get("items", []):
         summary = event.get("summary", "")
         event_id = event.get("id", "")
@@ -123,6 +128,8 @@ def load_charge_targets(
                 source_event_id=event_id,
                 source_event_summary=summary,
                 parse_warnings=tuple(warnings),
+                calendar_id=calendar_id,
+                writable=writable,
             )
         )
 

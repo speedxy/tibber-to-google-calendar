@@ -71,6 +71,13 @@ class ChargingConfig:
     # um Schaltfenster passgenauer schneiden zu können.
     slot_minutes: int = 15
     max_cycles_warning: int = 3        # Schwellwert für Warnung bei Fragmentierung
+    # Kalender, in denen nach #charge-Ladezielen gesucht wird. Leer = nur
+    # GOOGLE_CALENDAR_ID. Lesezugriff reicht; mit Schreibzugriff bekommt der
+    # #charge-Termin zusätzlich den Ladeplan in die Beschreibung.
+    target_calendar_ids: tuple[str, ...] = ()
+
+    def targets_or(self, default_calendar_id: str) -> tuple[str, ...]:
+        return self.target_calendar_ids or (default_calendar_id,)
 
 
 @dataclass(frozen=True)
@@ -190,6 +197,7 @@ def load_config(base_dir: str) -> Config:
             buffer_factor=float(charging_raw.get("buffer_factor", 1.10)),
             slot_minutes=int(charging_raw.get("slot_minutes", ChargingConfig.slot_minutes)),
             max_cycles_warning=int(charging_raw.get("max_cycles_warning", 3)),
+            target_calendar_ids=tuple(str(c) for c in (charging_raw.get("target_calendar_ids") or []) if c),
         )
     except (TypeError, ValueError) as e:
         logging.warning(f"⚠️ CHARGING-Block ungültig ({e}). Verwende Defaults.")

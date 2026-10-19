@@ -103,6 +103,10 @@ class State:
     hardware: HardwareState = field(default_factory=HardwareState)
     tibber_events: CalendarEventsCache = field(default_factory=CalendarEventsCache)
     forecast_events: CalendarEventsCache = field(default_factory=CalendarEventsCache)
+    # Kalender (GOOGLE_CALENDAR_ID), für den tibber_events/forecast_events/plans
+    # gelten. Bei Wechsel setzt main diese Caches zurück, sonst hielte das
+    # Hash-Diffing den neuen, leeren Kalender für "unverändert".
+    calendar_id: str | None = None
 
 
 def _state_path(base_dir: str) -> str:
@@ -190,6 +194,7 @@ def load_state(base_dir: str) -> State:
         schema_version=version, tibber=tibber, forecast=forecast,
         vehicle=vehicle, plans=plans, hardware=hardware,
         tibber_events=tibber_events, forecast_events=forecast_events,
+        calendar_id=data.get("calendar_id"),
     )
 
 

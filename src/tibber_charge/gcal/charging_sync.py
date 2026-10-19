@@ -125,9 +125,15 @@ def sync_charge_plans(
     plans: list[ChargePlan],
     vehicle_name: str,
     now: datetime,
+    targets_by_id: dict | None = None,
 ) -> dict[str, dict]:
     """Synchronisiert berechnete Pläne mit dem Calendar. Liefert das neue
     `by_target`-Dict für den State (mit aktuellen child_event_ids).
+
+    `#charging`-Termine landen immer in `calendar_id`. Die Plan-Beschreibung
+    kommt in den Kalender, aus dem das Ladeziel stammt (`targets_by_id`),
+    und nur, wenn dort Schreibzugriff besteht. Ohne `targets_by_id` wird
+    `calendar_id` angenommen (alte Aufrufer, Tests).
 
     Hash-Diffing: bei unverändertem Hash werden keine Calendar-API-Calls
     abgesetzt — abgesehen vom einmaligen Orphan-Scan vor der Iteration.
@@ -179,7 +185,16 @@ def sync_charge_plans(
 
         # Description des #charge-Targets patchen
         target_description = build_target_description(plan, vehicle_name)
-        update_event_description(calendar_id, creds, target_id, target_description)
+        target = (targets_by_id or {}).get(target_id)
+        if target is None:
+            update_event_description(calendar_id, creds, target_id, target_description)
+        elif target.writable:
+            update_event_description(target.calendar_id or calendar_id, creds, target_id, target_description)
+        else:
+            logging.info(
+                f"ℹ️ Ladeziel {target_id[:12]}... liegt in einem nur lesbaren Kalender; "
+                "Plan wird nicht in die Terminbeschreibung geschrieben."
+            )
 
         new_state[target_id] = {
             "plan_hash": plan.plan_hash,

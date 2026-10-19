@@ -27,7 +27,7 @@ pytest tests/                          # runs the full suite
 pytest tests/test_merger.py -v         # single file
 ```
 
-`tests/conftest.py` injects `src/` into `sys.path`, so no `pip install -e .` needed. Currently 235 tests covering merger, EpexPredictor provider + fallback, self-learning price mapping, UnifiedPrice, GSI mapping, penalty curve, both Corrently and Open-Meteo providers (with `responses` HTTP mock), forecast cache lifecycle, dynamic levels, calibration logging (record/match/trim + meta-features), manual + Tessie + Tibber vehicle providers, vehicle cache lifecycle, LinearStrategy planning (incl. 15-min sub-slot expansion + partial allocation), charging sync, Tibber + Vorhersage hash-diff sync (incl. orphan-cleanup auch im Steady-State), gcal events pagination, Tibber day-rollover (yesterday-Cache), Home Assistant client (incl. get_state), `_drive_charging` logic, wallbox plug sensor override, config parsing and the Tibber Data API client (PKCE, token refresh, 401 retry).
+`tests/conftest.py` injects `src/` into `sys.path`, so no `pip install -e .` needed. Currently 244 tests covering multi-calendar charge targets, merger, EpexPredictor provider + fallback, self-learning price mapping, UnifiedPrice, GSI mapping, penalty curve, both Corrently and Open-Meteo providers (with `responses` HTTP mock), forecast cache lifecycle, dynamic levels, calibration logging (record/match/trim + meta-features), manual + Tessie + Tibber vehicle providers, vehicle cache lifecycle, LinearStrategy planning (incl. 15-min sub-slot expansion + partial allocation), charging sync, Tibber + Vorhersage hash-diff sync (incl. orphan-cleanup auch im Steady-State), gcal events pagination, Tibber day-rollover (yesterday-Cache), Home Assistant client (incl. get_state), `_drive_charging` logic, wallbox plug sensor override, config parsing and the Tibber Data API client (PKCE, token refresh, 401 retry).
 
 ## Repo layout
 
@@ -291,6 +291,8 @@ Input events the user creates to specify charge deadlines. Read but never modifi
 **Deadline = `event.start`** (user decision 2026-05-20). The car must reach `target_soc` *by* event start. `event.end` is ignored. All-day events have no `dateTime`, so they're skipped with a warning.
 
 **Conflict detection** (`detect_conflicts`): V1 is single-car, so any two targets with identical deadlines are flagged. Only equal-deadline conflicts here — real charge-window overlaps emerge after Phase 5 planning and are handled separately.
+
+**Mehrere Kalender** (seit 2026-10-19): `CHARGING.target_calendar_ids` (Tuple, leer = nur `GOOGLE_CALENDAR_ID`). `_plan_charge_targets` sammelt aus allen, dedupliziert per Event-ID, sortiert nach Deadline und liefert `(plans, targets_by_id)`. `ChargeTarget` trägt `calendar_id` und `writable` (aus `accessRole` der events.list-Antwort: writer/owner). `sync_charge_plans(..., targets_by_id=...)` legt `#charging` immer in `GOOGLE_CALENDAR_ID` an, patcht die Plan-Beschreibung aber im Quell-Kalender und nur bei `writable`. Bei Kalenderwechsel setzt `main._reset_caches_on_calendar_change` (über `state.calendar_id`) `tibber_events`, `forecast_events` und `plans.by_target` zurück; alte Termine im vorherigen Kalender werden nicht aufgeräumt. `state.calendar_id is None` (alte state.json) gilt NICHT als Wechsel.
 
 **Lookahead window**: `main.CHARGE_TARGET_LOOKAHEAD` = 7 days. Targets beyond Tibber's day-ahead horizon (24–48 h) are visible but not yet plannable.
 

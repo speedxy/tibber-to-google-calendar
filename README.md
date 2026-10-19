@@ -363,7 +363,7 @@ Komplettes `config.json`-Beispiel findest du in `config.example.json`. Die wicht
 | `TIBBER_DATA_API` | nein | OAuth-Client (`client_id`, `client_secret`, `redirect_uri`) für den Fahrzeug-Akkustand über Tibber |
 | `VEHICLE` | nein | Provider (`tibber`, `tessie` oder `manual`), `tibber_vehicle_id` bzw. VIN+Token, Batteriekapazität |
 | `WALLBOX` | nein | `gross_kw` / `net_kw` deiner Wallbox (Default 11/10) |
-| `CHARGING` | nein | Puffer, Slot-Länge, Cycle-Warnung |
+| `CHARGING` | nein | Puffer, Slot-Länge, Cycle-Warnung, `target_calendar_ids` (Kalender, in denen nach `#charge`-Ladezielen gesucht wird; Default nur `GOOGLE_CALENDAR_ID`) |
 | `HOMEASSISTANT` | nein | Default `enabled=false`. Mit Steuerung: URL+Token+Entity-IDs |
 
 Geheimnisse (`config.json`, `service_account.json`, `tibber_data_token.json`) sind via `.gitignore` ausgeschlossen.
@@ -389,6 +389,18 @@ Abfahrt zur Arbeit 80% #charge      → 80 %, Freitext drumherum egal
 * **Werte außerhalb 1–100 %** werden abgelehnt.
 * **Konflikte** (zwei Ziele mit identischer Deadline) erzeugen eine Log-Warnung — V1 unterstützt nur ein Auto, also keine parallele Ladung.
 * **Description** des `#charge`-Termins wird vom Skript überschrieben — nichts Wichtiges hineinschreiben.
+
+**Ladeziele aus mehreren Kalendern:** Mit `CHARGING.target_calendar_ids` sucht das Skript in mehreren Kalendern nach `#charge`-Terminen, z. B. im eigenen Ladeplanungs-Kalender und im privaten Hauptkalender:
+
+```json
+"CHARGING": {
+    "target_calendar_ids": ["ladeplanung-id@group.calendar.google.com", "du@gmail.com"]
+}
+```
+
+Jeder Kalender muss für den Service-Account freigegeben sein. Lesezugriff reicht für die Planung; nur mit „Änderungen an Terminen vornehmen" schreibt das Skript den Ladeplan auch in die Beschreibung des `#charge`-Termins. Preise und `#charging`-Lade-Termine landen immer in `GOOGLE_CALENDAR_ID`.
+
+**Kalender wechseln:** Wird `GOOGLE_CALENDAR_ID` geändert, legt das Skript beim nächsten Lauf alle Termine im neuen Kalender neu an. Die alten `#Tibber`-, `#Vorhersage`- und `#charging`-Termine im vorherigen Kalender bleiben stehen und müssen von Hand gelöscht werden.
 
 ### **Manuell ausführen**
 
@@ -525,7 +537,7 @@ pip install -r requirements-dev.txt
 pytest tests/
 ```
 
-235 Tests covering Merger, Forecast (EpexPredictor + Open-Meteo + Corrently + Rückfall + Cache + Kalibrierung + selbstlernende Umrechnung), Vehicle (Manual + Tessie + Tibber), Planning (LinearStrategy inkl. 15-min-Expansion + Partial-Allokation), Calendar-Sync für alle drei Event-Typen (Hash-Diff + Hashtag-Delete für #Tibber/#Vorhersage, per-ID + Orphan-Cleanup für #charging, Pagination, per-Event Delete-Robustheit), Tibber-Day-Rollover (Yesterday-Cache für Mitternachts-spannende Perioden), Config-Parsing, Tibber Data API (OAuth-Token-Erneuerung), Hardware (HA-Client + Drive-Logik + Stecker-Sensor) und Parsing. `tests/conftest.py` injiziert `src/` in `sys.path` — kein `pip install -e .` nötig.
+244 Tests covering Merger, Forecast (EpexPredictor + Open-Meteo + Corrently + Rückfall + Cache + Kalibrierung + selbstlernende Umrechnung), Vehicle (Manual + Tessie + Tibber), Planning (LinearStrategy inkl. 15-min-Expansion + Partial-Allokation), Calendar-Sync für alle drei Event-Typen (Hash-Diff + Hashtag-Delete für #Tibber/#Vorhersage, per-ID + Orphan-Cleanup für #charging, Pagination, per-Event Delete-Robustheit), Tibber-Day-Rollover (Yesterday-Cache für Mitternachts-spannende Perioden), Config-Parsing, Tibber Data API (OAuth-Token-Erneuerung), Hardware (HA-Client + Drive-Logik + Stecker-Sensor) und Parsing. `tests/conftest.py` injiziert `src/` in `sys.path` — kein `pip install -e .` nötig.
 
 ### **Repository-Layout**
 

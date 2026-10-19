@@ -32,7 +32,7 @@ from tibber_charge.prices.merger import unified_prices
 from tibber_charge.prices.types import UnifiedPrice
 from tibber_charge.vehicle.base import VehicleStatus
 from tibber_charge.vehicle.cache import fetch_status_with_cache
-from tibber_charge.state import load_state, save_state, state_lock
+from tibber_charge.state import CalendarEventsCache, load_state, save_state, state_lock
 from tibber_charge.tibber.cache import fetch_with_cache
 from tibber_charge.tibber.grouping import group_price_periods
 
@@ -72,18 +72,27 @@ def _plan_charge_targets(
     vehicle_status: VehicleStatus | None,
     merged_prices: list[UnifiedPrice],
     now: datetime,
-) -> list[ChargePlan]:
-    """Liest #charge-Targets, berechnet Pläne, loggt + persistiert.
+) -> tuple[list[ChargePlan], dict]:
+    """Liest #charge-Targets aus allen konfigurierten Kalendern, berechnet Pläne, loggt.
 
-    Returnt die Pläne — Phase 6 (Calendar Sync) wird sie konsumieren.
+    Liefert (Pläne, Ladeziele nach Event-ID). Die Ladeziele braucht der
+    Calendar-Sync, um den Plan in den richtigen Quell-Kalender zu schreiben.
     """
-    targets = load_charge_targets(
-        config.google_calendar_id, creds,
-        time_min=now, time_max=now + CHARGE_TARGET_LOOKAHEAD,
-    )
+    targets: list = []
+    seen_ids: set[str] = set()
+    for calendar_id in config.charging.targets_or(config.google_calendar_id):
+        for t in load_charge_targets(
+            calendar_id, creds, time_min=now, time_max=now + CHARGE_TARGET_LOOKAHEAD,
+        ):
+            # Derselbe Termin kann über Einladungen in mehreren Kalendern stehen.
+            if t.source_event_id not in seen_ids:
+                seen_ids.add(t.source_event_id)
+                targets.append(t)
+    targets.sort(key=lambda t: t.deadline)
+    targets_by_id = {t.source_event_id: t for t in targets}
     if not targets:
         logging.info("ℹ️ Keine #charge-Ladeziele im 7-Tage-Fenster.")
-        return []
+        return [], targets_by_id
 
     logging.info(f"🔋 {len(targets)} Ladeziel(e) gefunden:")
     for t in targets:
@@ -101,7 +110,7 @@ def _plan_charge_targets(
     # Wenn wir keinen aktuellen SoC haben, können wir nicht planen.
     if vehicle_status is None or vehicle_status.soc is None:
         logging.warning("⚠️ Kein bekannter SoC — überspringe Ladeplanung.")
-        return []
+        return [], targets_by_id
 
     strategy = LinearStrategy(
         buffer_factor=config.charging.buffer_factor,
@@ -122,7 +131,7 @@ def _plan_charge_targets(
         plans.append(plan)
         _log_plan(t, plan)
 
-    return plans
+    return plans, targets_by_id
 
 
 def _log_plan(target, plan: ChargePlan) -> None:
@@ -200,8 +209,10 @@ def _run_locked(base_dir: str, config) -> None:
         logging.error("❌ Google Calendar Authentifizierung fehlgeschlagen. Abbruch.")
         return
 
+    _reset_caches_on_calendar_change(state, config.google_calendar_id)
+
     # Pläne berechnen → mit Calendar synchronisieren (Hash-Diffing).
-    plans = _plan_charge_targets(config, creds, state, vehicle_status, merged, now)
+    plans, targets_by_id = _plan_charge_targets(config, creds, state, vehicle_status, merged, now)
     if plans:
         state.plans.by_target = sync_charge_plans(
             calendar_id=config.google_calendar_id,
@@ -210,6 +221,7 @@ def _run_locked(base_dir: str, config) -> None:
             plans=plans,
             vehicle_name=config.vehicle.vehicle_name,
             now=now,
+            targets_by_id=targets_by_id,
         )
     elif state.plans.by_target:
         # Keine aktuellen Pläne mehr (z.B. alle Targets gelöscht oder SoC unbekannt)
@@ -293,6 +305,22 @@ def _map_forecast_to_tibber(
         state.forecast.price_mapping = fitted.to_dict()
     log_mapping(mapping, fresh=fitted is not None)
     return apply_mapping(forecast_prices, mapping)
+
+
+def _reset_caches_on_calendar_change(state, calendar_id: str) -> None:
+    """Nach Wechsel von GOOGLE_CALENDAR_ID gelten die Event-Caches für den alten
+    Kalender. Ohne Reset hielte das Hash-Diffing den neuen, leeren Kalender für
+    "unverändert". Termine im alten Kalender räumt das Skript NICHT auf.
+    """
+    if state.calendar_id is not None and state.calendar_id != calendar_id:
+        logging.warning(
+            "⚠️ Ziel-Kalender gewechselt: Termine werden im neuen Kalender neu angelegt. "
+            "Alte #Tibber/#Vorhersage/#charging-Termine im vorherigen Kalender bitte selbst löschen."
+        )
+        state.tibber_events = CalendarEventsCache()
+        state.forecast_events = CalendarEventsCache()
+        state.plans.by_target = {}
+    state.calendar_id = calendar_id
 
 
 def _apply_plug_sensor(config, status: VehicleStatus | None) -> VehicleStatus | None:
