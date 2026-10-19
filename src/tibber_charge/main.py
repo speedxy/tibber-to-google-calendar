@@ -143,8 +143,17 @@ def _log_plan(target, plan: ChargePlan) -> None:
             f"{b.expected_kwh:.1f} kWh @ {b.price_eur_per_kwh*100:.1f}ct/kWh "
             f"= {b.expected_cost_eur:.2f}€{forecast_flag}"
         )
+    # Hinweise zu machbaren Plänen (Ziel schon erreicht, Prognose-Anteil, viele
+    # Blöcke) nur als INFO: sonst schreibt jeder 15-min-Cron-Lauf sie ins Log.
+    # WARNING nur, wenn das Ziel nicht erreichbar ist.
+    if not plan.feasible:
+        logging.warning(
+            f"⚠️ Ladeziel {target_label} bis {plan.deadline.strftime('%d.%m. %H:%M')} "
+            f"ist mit den verfügbaren Slots NICHT erreichbar."
+        )
+    log = logging.warning if not plan.feasible else logging.info
     for w in plan.warnings:
-        logging.warning(f"  {w}")
+        log(f"  {w}")
 
 
 def _run_locked(base_dir: str, config) -> None:

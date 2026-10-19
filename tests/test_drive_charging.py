@@ -209,3 +209,34 @@ def test_heartbeat_disabled_kein_call(client_cls):
     state = State()
     _drive_charging(_config(heartbeat=None), state, [plan], _now())
     client.write_input_datetime.assert_not_called()
+
+
+# ---- Log-Level der Plan-Hinweise ----
+
+def _plan_with(feasible: bool, warnings: list[str]):
+    from types import SimpleNamespace
+    return SimpleNamespace(
+        deadline=_now() + timedelta(days=1), current_soc=20, target_soc=80, kwh_needed=10.0,
+        cycles=1, total_cost_eur=4.0, feasible=feasible, blocks=(), warnings=warnings,
+    )
+
+
+def test_hinweise_machbarer_plaene_nur_info(caplog):
+    """96 Cron-Läufe am Tag sollen das Log nicht mit 'Ziel schon erreicht' füllen."""
+    import logging
+    from types import SimpleNamespace
+    from tibber_charge.main import _log_plan
+    caplog.set_level(logging.INFO)
+    _log_plan(SimpleNamespace(target_soc=10, car_id=None), _plan_with(True, ["Ziel-SoC bereits erreicht"]))
+    assert not [r for r in caplog.records if r.levelno >= logging.WARNING]
+
+
+def test_nicht_machbarer_plan_warnt(caplog):
+    import logging
+    from types import SimpleNamespace
+    from tibber_charge.main import _log_plan
+    caplog.set_level(logging.INFO)
+    _log_plan(SimpleNamespace(target_soc=100, car_id=None), _plan_with(False, ["zu wenig Zeit"]))
+    warnings = [r.getMessage() for r in caplog.records if r.levelno >= logging.WARNING]
+    assert any("NICHT erreichbar" in m for m in warnings)
+    assert any("zu wenig Zeit" in m for m in warnings)
