@@ -4,6 +4,11 @@ token.json
 config.json
 service_account.json
 
+# Lokaler State (Cache, Backoff, Plan)
+state.json
+state.json.tmp.*
+state.lock
+
 # Python-spezifische Ignorierungen
 __pycache__/
 *.pyc
@@ -17,3 +22,6 @@ venv/
 
 # Systemspezifische Ignorierungen
 .DS_STORE
+# Tibber Data API (OAuth-Tokens)
+tibber_data_token.json
+tibber_data_token.json.tmp.*

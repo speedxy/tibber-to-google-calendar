@@ -1,4 +1,52 @@
 {
     "TIBBER_API_KEY": "dein-tibber-api-key-hier",
-    "GOOGLE_CALENDAR_ID": "dein-google-kalender-id-hier"
+    "GOOGLE_CALENDAR_ID": "dein-google-kalender-id-hier",
+    "TIBBER_DATA_API": {
+        "client_id": "deine-tibber-data-client-id",
+        "client_secret": "dein-tibber-data-client-secret",
+        "redirect_uri": "http://localhost:8765/callback"
+    },
+    "FORECAST": {
+        "enabled": true,
+        "calendar_events_enabled": true,
+        "provider": "epex_predictor",
+        "fallback_provider": "open_meteo",
+        "region": "DE",
+        "epex_predictor_url": "https://epexpredictor.batzill.com/prices_short",
+        "latitude": 53.87,
+        "longitude": 10.69,
+        "horizon_days": 7,
+        "timeout_seconds": 10.0
+    },
+    "VEHICLE": {
+        "enabled": true,
+        "provider": "manual",
+        "vehicle_name": "Auto",
+        "battery_capacity_kwh": 60.0,
+        "manual_soc": 50,
+        "manual_connected": false,
+        "manual_charging": false,
+        "vin": null,
+        "api_token": null,
+        "tibber_vehicle_id": null,
+        "timeout_seconds": 10.0
+    },
+    "WALLBOX": {
+        "gross_kw": 11.0,
+        "net_kw": 10.0
+    },
+    "CHARGING": {
+        "buffer_factor": 1.1,
+        "slot_minutes": 15,
+        "max_cycles_warning": 3
+    },
+    "HOMEASSISTANT": {
+        "enabled": false,
+        "base_url": "http://homeassistant.local:8123",
+        "api_token": "dein-ha-long-lived-access-token",
+        "charging_entity_id": "input_boolean.tibber_charging_active",
+        "heartbeat_entity_id": "input_datetime.tibber_last_heartbeat",
+        "plug_entity_id": "binary_sensor.keba_p30_plug",
+        "timeout_seconds": 5.0
+    }
 }
